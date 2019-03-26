@@ -86,7 +86,7 @@ func NewClient(clbClient LBiface, albClient LBiface, conf Config) *Client {
 	servers := Servers{}
 	m := make(map[string]struct{})
 	for _, server := range clbClient.Servers() {
-		// Dobule check
+		// Double check
 		if _, ok := m[server.id]; !ok {
 			servers = append(servers, server)
 			m[server.id] = struct{}{}
