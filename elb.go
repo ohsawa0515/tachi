@@ -1,4 +1,4 @@
-package main
+package tachi
 
 import (
 	"context"
@@ -16,9 +16,14 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	cooldown = 60
+	interval = 60
+)
+
 // LBiface -
 type LBiface interface {
-	FetchInstancesUnderLB(context.Context, ...string) error
+	FetchInstancesUnderLB(context.Context, []string) error
 	Servers() Servers
 	Lbs() []string
 	ELbSvc() elbiface.ELBAPI
@@ -57,9 +62,9 @@ type Server struct {
 }
 
 // NewELBClient -
-func NewELBClient(kind, region string) LBiface {
+func NewELBClient(kind string, conf Config) LBiface {
 	sess := session.Must(session.NewSession(
-		&aws.Config{Region: aws.String(region)}))
+		&aws.Config{Region: aws.String(conf.Region)}))
 
 	switch kind {
 	case "clb":
@@ -75,7 +80,7 @@ func NewELBClient(kind, region string) LBiface {
 	}
 }
 
-func NewClient(clbClient LBiface, albClient LBiface) *Client {
+func NewClient(clbClient LBiface, albClient LBiface, conf Config) *Client {
 
 	// Merge servers
 	servers := Servers{}
@@ -96,7 +101,7 @@ func NewClient(clbClient LBiface, albClient LBiface) *Client {
 	}
 
 	sess := session.Must(session.NewSession(
-		&aws.Config{Region: aws.String(region)}))
+		&aws.Config{Region: aws.String(conf.Region)}))
 
 	return &Client{
 		ec2Svc:    ec2.New(sess),
@@ -107,7 +112,7 @@ func NewClient(clbClient LBiface, albClient LBiface) *Client {
 }
 
 // FetchInstancesUnderLB returns instances belonging to Classic Load Balancers
-func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, clbs ...string) error {
+func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, clbs []string) error {
 	eg := errgroup.Group{}
 	m := make(map[string]struct{})
 	for _, clb := range clbs {
@@ -152,7 +157,7 @@ func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, clbs ...string) e
 }
 
 // FetchInstancesUnderLB returns instances belonging to Application Load Balancers
-func (a *albClient) FetchInstancesUnderLB(ctx context.Context, albs ...string) error {
+func (a *albClient) FetchInstancesUnderLB(ctx context.Context, albs []string) error {
 	eg := errgroup.Group{}
 	m := make(map[string]struct{})
 	for _, alb := range albs {

@@ -1,4 +1,4 @@
-package main
+package tachi
 
 import (
 	"log"
@@ -45,7 +45,7 @@ func (c *Client) restartServer(server Server) error {
 		return err
 	}
 
-	// Wait until cooldown time
+	// Wait until cool down time
 	time.Sleep(time.Duration(cooldown) * time.Second)
 
 	log.Printf("Instance %s has been restartd", server.id)
