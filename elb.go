@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elb/elbiface"
@@ -61,26 +59,22 @@ type Server struct {
 	update bool
 }
 
-// NewELBClient -
-func NewELBClient(kind string, conf Config) LBiface {
-	sess := session.Must(session.NewSession(
-		&aws.Config{Region: aws.String(conf.Region)}))
-
-	switch kind {
-	case "clb":
-		return &clbClient{
-			elbSvc: elb.New(sess),
-		}
-	case "alb":
-		return &albClient{
-			elbv2Svc: elbv2.New(sess),
-		}
-	default:
-		return nil
+// NewClbClient -
+func NewClbClient(svc elbiface.ELBAPI) LBiface {
+	return &clbClient{
+		elbSvc: svc,
 	}
 }
 
-func NewClient(clbClient LBiface, albClient LBiface, conf Config) *Client {
+// NewAlbClient -
+func NewAlbClient(svc elbv2iface.ELBV2API) LBiface {
+	return &albClient{
+		elbv2Svc: svc,
+	}
+}
+
+// NewClient -
+func NewClient(svc ec2iface.EC2API, clbClient LBiface, albClient LBiface) *Client {
 
 	// Merge servers
 	servers := Servers{}
@@ -100,11 +94,8 @@ func NewClient(clbClient LBiface, albClient LBiface, conf Config) *Client {
 		}
 	}
 
-	sess := session.Must(session.NewSession(
-		&aws.Config{Region: aws.String(conf.Region)}))
-
 	return &Client{
-		ec2Svc:    ec2.New(sess),
+		ec2Svc:    svc,
 		clbClient: clbClient,
 		albClient: albClient,
 		servers:   servers,
