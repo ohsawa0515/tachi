@@ -40,7 +40,7 @@ func Run(conf Config) error {
 	}
 
 	elbClient := NewClient(ec2.New(sess), clbClient, albClient)
-	if err := elbClient.RestartServers(); err != nil {
+	if err := elbClient.RestartServers(conf); err != nil {
 		log.Fatal(err)
 	}
 

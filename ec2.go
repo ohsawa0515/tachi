@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
-func (c *Client) restartServer(server Server) error {
+func (c *Client) restartServer(server Server, conf Config) error {
 
 	log.Printf("Instance %s will restart from now on", server.id)
 
@@ -46,7 +46,7 @@ func (c *Client) restartServer(server Server) error {
 	}
 
 	// Wait until cool down time
-	time.Sleep(time.Duration(cooldown) * time.Second)
+	time.Sleep(conf.CoolDown)
 
 	log.Printf("Instance %s has been restartd", server.id)
 

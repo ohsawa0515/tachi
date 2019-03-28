@@ -16,7 +16,10 @@ import (
 
 const (
 	timeout  = 60
+	coolDown = 2
+	interval = 2
 	waitTime = 2
+	region   = "us-east-1"
 )
 
 type mockElbSvc struct {
@@ -128,6 +131,12 @@ func TestRestartServers(t *testing.T) {
 	defer cancel()
 
 	elbs := []string{"test-clb", "test-alb"}
+	conf := Config{
+		Timeout:  time.Duration(timeout) * time.Second,
+		CoolDown: time.Duration(coolDown) * time.Second,
+		Interval: time.Duration(interval) * time.Second,
+		Region:   region,
+	}
 
 	clbClient, err := clbFetchInstancesUnderLB(ctx, elbs)
 	if err != nil {
@@ -143,7 +152,7 @@ func TestRestartServers(t *testing.T) {
 
 	ec2Svc := &mockEC2Svc{}
 	elbClient := NewClient(ec2Svc, clbClient, albClient)
-	if err := elbClient.RestartServers(); err != nil {
+	if err := elbClient.RestartServers(conf); err != nil {
 		t.Error(err)
 	}
 }

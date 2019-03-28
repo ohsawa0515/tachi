@@ -14,11 +14,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	cooldown = 60
-	interval = 60
-)
-
 // LBiface -
 type LBiface interface {
 	FetchInstancesUnderLB(context.Context, []string) error
@@ -231,18 +226,18 @@ func (a *albClient) ELbV2Svc() elbv2iface.ELBV2API {
 
 // RestartServers reboots the servers.
 // When rebooting, detach from the ELB and attach to the ELB when rebooting is complete.
-func (c *Client) RestartServers() error {
+func (c *Client) RestartServers(conf Config) error {
 
 	for _, server := range c.servers {
 		if err := c.detachFromLoadBalancer(server); err != nil {
 			return err
 		}
 
-		if err := c.restartServer(server); err != nil {
+		if err := c.restartServer(server, conf); err != nil {
 			return err
 		}
 
-		if err := c.attachWithLoadBalancer(server); err != nil {
+		if err := c.attachWithLoadBalancer(server, conf); err != nil {
 			return err
 		}
 	}
@@ -356,7 +351,7 @@ func (c *Client) detachFromLoadBalancer(server Server) error {
 	return nil
 }
 
-func (c *Client) attachWithLoadBalancer(server Server) error {
+func (c *Client) attachWithLoadBalancer(server Server, conf Config) error {
 
 	log.Printf("Instance %s will attach to ELB from now on", server.id)
 
@@ -425,7 +420,7 @@ func (c *Client) attachWithLoadBalancer(server Server) error {
 	log.Printf("Instance %s has been attached to ELB", server.id)
 
 	// Wait until interval
-	time.Sleep(time.Duration(interval) * time.Second)
+	time.Sleep(conf.Interval)
 
 	return nil
 }
