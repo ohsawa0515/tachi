@@ -1,4 +1,4 @@
-package main
+package tachi
 
 import (
 	"context"
@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elb/elbiface"
@@ -18,7 +16,7 @@ import (
 
 // LBiface -
 type LBiface interface {
-	FetchInstancesUnderLB(context.Context, ...string) error
+	FetchInstancesUnderLB(context.Context, []string) error
 	Servers() Servers
 	Lbs() []string
 	ELbSvc() elbiface.ELBAPI
@@ -56,32 +54,28 @@ type Server struct {
 	update bool
 }
 
-// NewELBClient -
-func NewELBClient(kind, region string) LBiface {
-	sess := session.Must(session.NewSession(
-		&aws.Config{Region: aws.String(region)}))
-
-	switch kind {
-	case "clb":
-		return &clbClient{
-			elbSvc: elb.New(sess),
-		}
-	case "alb":
-		return &albClient{
-			elbv2Svc: elbv2.New(sess),
-		}
-	default:
-		return nil
+// NewClbClient -
+func NewClbClient(svc elbiface.ELBAPI) LBiface {
+	return &clbClient{
+		elbSvc: svc,
 	}
 }
 
-func NewClient(clbClient LBiface, albClient LBiface) *Client {
+// NewAlbClient -
+func NewAlbClient(svc elbv2iface.ELBV2API) LBiface {
+	return &albClient{
+		elbv2Svc: svc,
+	}
+}
+
+// NewClient -
+func NewClient(svc ec2iface.EC2API, clbClient LBiface, albClient LBiface) *Client {
 
 	// Merge servers
 	servers := Servers{}
 	m := make(map[string]struct{})
 	for _, server := range clbClient.Servers() {
-		// Dobule check
+		// Double check
 		if _, ok := m[server.id]; !ok {
 			servers = append(servers, server)
 			m[server.id] = struct{}{}
@@ -95,11 +89,8 @@ func NewClient(clbClient LBiface, albClient LBiface) *Client {
 		}
 	}
 
-	sess := session.Must(session.NewSession(
-		&aws.Config{Region: aws.String(region)}))
-
 	return &Client{
-		ec2Svc:    ec2.New(sess),
+		ec2Svc:    svc,
 		clbClient: clbClient,
 		albClient: albClient,
 		servers:   servers,
@@ -107,7 +98,7 @@ func NewClient(clbClient LBiface, albClient LBiface) *Client {
 }
 
 // FetchInstancesUnderLB returns instances belonging to Classic Load Balancers
-func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, clbs ...string) error {
+func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, clbs []string) error {
 	eg := errgroup.Group{}
 	m := make(map[string]struct{})
 	for _, clb := range clbs {
@@ -152,7 +143,7 @@ func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, clbs ...string) e
 }
 
 // FetchInstancesUnderLB returns instances belonging to Application Load Balancers
-func (a *albClient) FetchInstancesUnderLB(ctx context.Context, albs ...string) error {
+func (a *albClient) FetchInstancesUnderLB(ctx context.Context, albs []string) error {
 	eg := errgroup.Group{}
 	m := make(map[string]struct{})
 	for _, alb := range albs {
@@ -235,18 +226,18 @@ func (a *albClient) ELbV2Svc() elbv2iface.ELBV2API {
 
 // RestartServers reboots the servers.
 // When rebooting, detach from the ELB and attach to the ELB when rebooting is complete.
-func (c *Client) RestartServers() error {
+func (c *Client) RestartServers(conf Config) error {
 
 	for _, server := range c.servers {
 		if err := c.detachFromLoadBalancer(server); err != nil {
 			return err
 		}
 
-		if err := c.restartServer(server); err != nil {
+		if err := c.restartServer(server, conf); err != nil {
 			return err
 		}
 
-		if err := c.attachWithLoadBalancer(server); err != nil {
+		if err := c.attachWithLoadBalancer(server, conf); err != nil {
 			return err
 		}
 	}
@@ -360,7 +351,7 @@ func (c *Client) detachFromLoadBalancer(server Server) error {
 	return nil
 }
 
-func (c *Client) attachWithLoadBalancer(server Server) error {
+func (c *Client) attachWithLoadBalancer(server Server, conf Config) error {
 
 	log.Printf("Instance %s will attach to ELB from now on", server.id)
 
@@ -429,7 +420,7 @@ func (c *Client) attachWithLoadBalancer(server Server) error {
 	log.Printf("Instance %s has been attached to ELB", server.id)
 
 	// Wait until interval
-	time.Sleep(time.Duration(interval) * time.Second)
+	time.Sleep(conf.Interval)
 
 	return nil
 }
