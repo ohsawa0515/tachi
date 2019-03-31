@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"strings"
 	"time"
 
@@ -26,15 +25,17 @@ func main() {
 	flag.StringVar(&region, "region", "ap-northeast-1", "Region")
 	flag.Parse()
 
+	log := tachi.NewLogger()
 	conf := tachi.Config{
 		Elbs:     strings.Split(elbs, ","),
 		Timeout:  time.Duration(timeout) * time.Second,
 		CoolDown: time.Duration(coolDown) * time.Second,
 		Interval: time.Duration(interval) * time.Second,
 		Region:   region,
+		Logger:   log,
 	}
 
 	if err := tachi.Run(conf); err != nil {
-		log.Fatal(err)
+		log.Fatalf("%+v\n", err)
 	}
 }

@@ -2,9 +2,9 @@ package tachi
 
 import (
 	"context"
-	"log"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -18,6 +18,7 @@ type Config struct {
 	CoolDown time.Duration
 	Interval time.Duration
 	Region   string
+	Logger   *logrus.Logger
 }
 
 // Run -
@@ -30,18 +31,18 @@ func Run(conf Config) error {
 		&aws.Config{Region: aws.String(conf.Region)}))
 
 	clbClient := NewClbClient(elb.New(sess))
-	if err := clbClient.FetchInstancesUnderLB(ctx, conf.Elbs); err != nil {
-		log.Fatal(err)
+	if err := clbClient.FetchInstancesUnderLB(ctx, conf); err != nil {
+		return err
 	}
 
 	albClient := NewAlbClient(elbv2.New(sess))
-	if err := albClient.FetchInstancesUnderLB(ctx, conf.Elbs); err != nil {
-		log.Fatal(err)
+	if err := albClient.FetchInstancesUnderLB(ctx, conf); err != nil {
+		return err
 	}
 
 	elbClient := NewClient(ec2.New(sess), clbClient, albClient)
 	if err := elbClient.RestartServers(conf); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	return nil
