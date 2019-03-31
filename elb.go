@@ -299,18 +299,14 @@ func (c *Client) detachFromLoadBalancer(server Server, conf Config) error {
 				return err
 			}
 
-			if err := c.clbClient.ELbSvc().WaitUntilInstanceDeregistered(&elb.DescribeInstanceHealthInput{
+			return c.clbClient.ELbSvc().WaitUntilInstanceDeregistered(&elb.DescribeInstanceHealthInput{
 				Instances: []*elb.Instance{
 					{
 						InstanceId: aws.String(server.id),
 					},
 				},
 				LoadBalancerName: aws.String(clb),
-			}); err != nil {
-				return err
-			}
-
-			return nil
+			})
 		})
 	}
 
@@ -329,18 +325,14 @@ func (c *Client) detachFromLoadBalancer(server Server, conf Config) error {
 				return err
 			}
 
-			if err := c.albClient.ELbV2Svc().WaitUntilTargetDeregistered(&elbv2.DescribeTargetHealthInput{
+			return c.albClient.ELbV2Svc().WaitUntilTargetDeregistered(&elbv2.DescribeTargetHealthInput{
 				Targets: []*elbv2.TargetDescription{
 					{
 						Id: aws.String(server.id),
 					},
 				},
 				TargetGroupArn: aws.String(alb),
-			}); err != nil {
-				return err
-			}
-
-			return nil
+			})
 		})
 	}
 
@@ -372,18 +364,14 @@ func (c *Client) attachWithLoadBalancer(server Server, conf Config) error {
 				return err
 			}
 
-			if err := c.clbClient.ELbSvc().WaitUntilInstanceInService(&elb.DescribeInstanceHealthInput{
+			return c.clbClient.ELbSvc().WaitUntilInstanceInService(&elb.DescribeInstanceHealthInput{
 				Instances: []*elb.Instance{
 					{
 						InstanceId: aws.String(server.id),
 					},
 				},
 				LoadBalancerName: aws.String(clb),
-			}); err != nil {
-				return err
-			}
-
-			return nil
+			})
 		})
 	}
 
@@ -400,18 +388,14 @@ func (c *Client) attachWithLoadBalancer(server Server, conf Config) error {
 				return err
 			}
 
-			if err := c.albClient.ELbV2Svc().WaitUntilTargetInService(&elbv2.DescribeTargetHealthInput{
+			return c.albClient.ELbV2Svc().WaitUntilTargetInService(&elbv2.DescribeTargetHealthInput{
 				Targets: []*elbv2.TargetDescription{
 					{
 						Id: aws.String(server.id),
 					},
 				},
 				TargetGroupArn: aws.String(alb),
-			}); err != nil {
-				return err
-			}
-
-			return nil
+			})
 		})
 	}
 

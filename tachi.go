@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elbv2"
 )
 
+// Config -
 type Config struct {
 	Elbs     []string
 	Timeout  time.Duration
@@ -41,9 +42,5 @@ func Run(conf Config) error {
 	}
 
 	elbClient := NewClient(ec2.New(sess), clbClient, albClient)
-	if err := elbClient.RestartServers(conf); err != nil {
-		return err
-	}
-
-	return nil
+	return elbClient.RestartServers(conf)
 }

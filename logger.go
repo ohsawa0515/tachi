@@ -6,6 +6,7 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+// NewLogger -
 func NewLogger() *logrus.Logger {
 	log := logrus.New()
 	log.SetFormatter(&logrus.TextFormatter{
