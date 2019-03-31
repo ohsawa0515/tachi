@@ -51,8 +51,7 @@ type Servers []Server
 
 // Server is EC2 instance
 type Server struct {
-	id     string
-	update bool
+	id string
 }
 
 // NewClbClient -
