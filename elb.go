@@ -2,6 +2,7 @@ package tachi
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -100,7 +101,7 @@ func NewClient(svc ec2iface.EC2API, clbClient LBiface, albClient LBiface) *Clien
 // FetchInstancesUnderLB returns instances belonging to Classic Load Balancers
 func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, conf Config) error {
 	eg := errgroup.Group{}
-	m := make(map[string]struct{})
+	m := sync.Map{}
 	for _, clb := range conf.Elbs {
 		clb := clb
 		eg.Go(func() error {
@@ -125,9 +126,9 @@ func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, conf Config) erro
 
 			for _, i := range resp.InstanceStates {
 				if *i.State == "InService" {
-					if _, ok := m[*i.InstanceId]; !ok { // 重複チェック
+					if _, ok := m.Load(*i.InstanceId); !ok { // 重複チェック
 						c.servers = append(c.servers, Server{id: *i.InstanceId})
-						m[*i.InstanceId] = struct{}{} // インスタンスIDを登録、重複チェックに利用する
+						m.Store(*i.InstanceId, struct{}{}) // インスタンスIDを登録、重複チェックに利用する
 					}
 				}
 			}
@@ -146,7 +147,7 @@ func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, conf Config) erro
 // FetchInstancesUnderLB returns instances belonging to Application Load Balancers
 func (a *albClient) FetchInstancesUnderLB(ctx context.Context, conf Config) error {
 	eg := errgroup.Group{}
-	m := make(map[string]struct{})
+	m := sync.Map{}
 	for _, alb := range conf.Elbs {
 		alb := alb
 		eg.Go(func() error {
@@ -168,9 +169,9 @@ func (a *albClient) FetchInstancesUnderLB(ctx context.Context, conf Config) erro
 
 			for _, t := range resp.TargetHealthDescriptions {
 				if *t.TargetHealth.State == "healthy" {
-					if _, ok := m[*t.Target.Id]; !ok { // 重複チェック
+					if _, ok := m.Load(*t.Target.Id); !ok { // 重複チェック
 						a.servers = append(a.servers, Server{id: *t.Target.Id})
-						m[*t.Target.Id] = struct{}{} // インスタンスIDを登録、重複チェックに利用する
+						m.Store(*t.Target.Id, struct{}{}) // インスタンスIDを登録、重複チェックに利用する
 					}
 				}
 			}
