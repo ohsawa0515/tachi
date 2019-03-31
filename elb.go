@@ -2,7 +2,6 @@ package tachi
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -11,12 +10,13 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb/elbiface"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/elbv2/elbv2iface"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
 // LBiface -
 type LBiface interface {
-	FetchInstancesUnderLB(context.Context, []string) error
+	FetchInstancesUnderLB(context.Context, Config) error
 	Servers() Servers
 	Lbs() []string
 	ELbSvc() elbiface.ELBAPI
@@ -98,10 +98,10 @@ func NewClient(svc ec2iface.EC2API, clbClient LBiface, albClient LBiface) *Clien
 }
 
 // FetchInstancesUnderLB returns instances belonging to Classic Load Balancers
-func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, clbs []string) error {
+func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, conf Config) error {
 	eg := errgroup.Group{}
 	m := make(map[string]struct{})
-	for _, clb := range clbs {
+	for _, clb := range conf.Elbs {
 		clb := clb
 		eg.Go(func() error {
 			if _, err := c.elbSvc.DescribeLoadBalancersWithContext(ctx, &elb.DescribeLoadBalancersInput{
@@ -109,6 +109,7 @@ func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, clbs []string) er
 					aws.String(clb),
 				},
 			}); err != nil {
+				conf.Logger.Debug(err)
 				return nil // Not Found
 			}
 
@@ -136,21 +137,22 @@ func (c *clbClient) FetchInstancesUnderLB(ctx context.Context, clbs []string) er
 	}
 
 	if err := eg.Wait(); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil
 }
 
 // FetchInstancesUnderLB returns instances belonging to Application Load Balancers
-func (a *albClient) FetchInstancesUnderLB(ctx context.Context, albs []string) error {
+func (a *albClient) FetchInstancesUnderLB(ctx context.Context, conf Config) error {
 	eg := errgroup.Group{}
 	m := make(map[string]struct{})
-	for _, alb := range albs {
+	for _, alb := range conf.Elbs {
 		alb := alb
 		eg.Go(func() error {
 			arn, err := a.GetTargetGroupArnFromLoadBalancerName(ctx, alb)
 			if err != nil {
+				conf.Logger.Debug(err)
 				return nil // Not Found
 			}
 
@@ -178,7 +180,7 @@ func (a *albClient) FetchInstancesUnderLB(ctx context.Context, albs []string) er
 	}
 
 	if err := eg.Wait(); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -229,7 +231,7 @@ func (a *albClient) ELbV2Svc() elbv2iface.ELBV2API {
 func (c *Client) RestartServers(conf Config) error {
 
 	for _, server := range c.servers {
-		if err := c.detachFromLoadBalancer(server); err != nil {
+		if err := c.detachFromLoadBalancer(server, conf); err != nil {
 			return err
 		}
 
@@ -276,9 +278,9 @@ func (a *albClient) GetTargetGroupArnFromLoadBalancerName(ctx context.Context, a
 	return resp.TargetGroups[0].TargetGroupArn, nil
 }
 
-func (c *Client) detachFromLoadBalancer(server Server) error {
+func (c *Client) detachFromLoadBalancer(server Server, conf Config) error {
 
-	log.Printf("Instance %s will detach from ELB", server.id)
+	conf.Logger.Infof("Instance %s will detach from ELB", server.id)
 
 	eg := errgroup.Group{}
 
@@ -343,17 +345,17 @@ func (c *Client) detachFromLoadBalancer(server Server) error {
 	}
 
 	if err := eg.Wait(); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	log.Printf("Instance %s has been detached from ELB", server.id)
+	conf.Logger.Infof("Instance %s has been detached from ELB", server.id)
 
 	return nil
 }
 
 func (c *Client) attachWithLoadBalancer(server Server, conf Config) error {
 
-	log.Printf("Instance %s will attach to ELB from now on", server.id)
+	conf.Logger.Infof("Instance %s will attach to ELB from now on", server.id)
 
 	eg := errgroup.Group{}
 
@@ -414,10 +416,10 @@ func (c *Client) attachWithLoadBalancer(server Server, conf Config) error {
 	}
 
 	if err := eg.Wait(); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	log.Printf("Instance %s has been attached to ELB", server.id)
+	conf.Logger.Infof("Instance %s has been attached to ELB", server.id)
 
 	// Wait until interval
 	time.Sleep(conf.Interval)

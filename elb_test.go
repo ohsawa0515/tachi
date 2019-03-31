@@ -108,19 +108,19 @@ func (elbV2Svc *mockElbV2Svc) WaitUntilTargetInService(*elbv2.DescribeTargetHeal
 	return nil
 }
 
-func clbFetchInstancesUnderLB(ctx context.Context, elbs []string) (LBiface, error) {
+func clbFetchInstancesUnderLB(ctx context.Context, conf Config) (LBiface, error) {
 	elbSvc := &mockElbSvc{}
 	clbClient := NewClbClient(elbSvc)
-	if err := clbClient.FetchInstancesUnderLB(ctx, elbs); err != nil {
+	if err := clbClient.FetchInstancesUnderLB(ctx, conf); err != nil {
 		return nil, err
 	}
 	return clbClient, nil
 }
 
-func albFetchInstancesUnderLB(ctx context.Context, elbs []string) (LBiface, error) {
+func albFetchInstancesUnderLB(ctx context.Context, conf Config) (LBiface, error) {
 	elbV2Svc := &mockElbV2Svc{}
 	albClient := NewAlbClient(elbV2Svc)
-	if err := albClient.FetchInstancesUnderLB(ctx, elbs); err != nil {
+	if err := albClient.FetchInstancesUnderLB(ctx, conf); err != nil {
 		return nil, err
 	}
 	return albClient, nil
@@ -132,17 +132,19 @@ func TestRestartServers(t *testing.T) {
 
 	elbs := []string{"test-clb", "test-alb"}
 	conf := Config{
+		Elbs:     elbs,
 		Timeout:  time.Duration(timeout) * time.Second,
 		CoolDown: time.Duration(coolDown) * time.Second,
 		Interval: time.Duration(interval) * time.Second,
 		Region:   region,
+		Logger:   NewLogger(),
 	}
 
-	clbClient, err := clbFetchInstancesUnderLB(ctx, elbs)
+	clbClient, err := clbFetchInstancesUnderLB(ctx, conf)
 	if err != nil {
 		t.Error(err)
 	}
-	albClient, err := albFetchInstancesUnderLB(ctx, elbs)
+	albClient, err := albFetchInstancesUnderLB(ctx, conf)
 	if err != nil {
 		t.Error(err)
 	}

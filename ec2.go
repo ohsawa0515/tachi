@@ -1,16 +1,16 @@
 package tachi
 
 import (
-	"log"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/pkg/errors"
 )
 
 func (c *Client) restartServer(server Server, conf Config) error {
 
-	log.Printf("Instance %s will restart from now on", server.id)
+	conf.Logger.Infof("Instance %s will restart from now on", server.id)
 
 	// Stop instance
 	if _, err := c.ec2Svc.StopInstances(&ec2.StopInstancesInput{
@@ -19,14 +19,14 @@ func (c *Client) restartServer(server Server, conf Config) error {
 		},
 		Force: aws.Bool(true),
 	}); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := c.ec2Svc.WaitUntilInstanceStopped(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{
 			aws.String(server.id),
 		},
 	}); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// Start instance
@@ -35,20 +35,20 @@ func (c *Client) restartServer(server Server, conf Config) error {
 			aws.String(server.id),
 		},
 	}); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if err := c.ec2Svc.WaitUntilInstanceStatusOk(&ec2.DescribeInstanceStatusInput{
 		InstanceIds: []*string{
 			aws.String(server.id),
 		},
 	}); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// Wait until cool down time
 	time.Sleep(conf.CoolDown)
 
-	log.Printf("Instance %s has been restartd", server.id)
+	conf.Logger.Infof("Instance %s has been restartd", server.id)
 
 	return nil
 }
