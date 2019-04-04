@@ -10,16 +10,26 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
+	"github.com/aws/aws-sdk-go/service/ssm"
+)
+
+const (
+	ModeRboot = "reboot"
+	ModeSsm   = "ssm"
 )
 
 // Config -
 type Config struct {
-	Elbs     []string
-	Timeout  time.Duration
-	CoolDown time.Duration
-	Interval time.Duration
-	Region   string
-	Logger   *logrus.Logger
+	Elbs             []string
+	Mode             string
+	Command          string
+	DocumentName     string
+	ExecutionTimeout string
+	Timeout          time.Duration
+	CoolDown         time.Duration
+	Interval         time.Duration
+	Region           string
+	Logger           *logrus.Logger
 }
 
 // Run -
@@ -41,6 +51,12 @@ func Run(conf Config) error {
 		return err
 	}
 
-	elbClient := NewClient(ec2.New(sess), clbClient, albClient)
-	return elbClient.RestartServers(conf)
+	elbClient := NewClient(ec2.New(sess), ssm.New(sess), clbClient, albClient)
+
+	switch conf.Mode {
+	case ModeSsm:
+		return elbClient.ExecuteSsmRunCommand(conf)
+	default:
+		return elbClient.RestartServers(conf)
+	}
 }

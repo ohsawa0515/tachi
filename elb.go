@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb/elbiface"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/elbv2/elbv2iface"
+	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
@@ -27,6 +28,7 @@ type LBiface interface {
 // Client is common client of clb and alb
 type Client struct {
 	ec2Svc    ec2iface.EC2API
+	ssmSvc    ssmiface.SSMAPI
 	clbClient LBiface
 	albClient LBiface
 	servers   Servers
@@ -69,7 +71,7 @@ func NewAlbClient(svc elbv2iface.ELBV2API) LBiface {
 }
 
 // NewClient -
-func NewClient(svc ec2iface.EC2API, clbClient LBiface, albClient LBiface) *Client {
+func NewClient(ec2Svc ec2iface.EC2API, ssmSvc ssmiface.SSMAPI, clbClient LBiface, albClient LBiface) *Client {
 
 	// Merge servers
 	servers := Servers{}
@@ -90,7 +92,8 @@ func NewClient(svc ec2iface.EC2API, clbClient LBiface, albClient LBiface) *Clien
 	}
 
 	return &Client{
-		ec2Svc:    svc,
+		ec2Svc:    ec2Svc,
+		ssmSvc:    ssmSvc,
 		clbClient: clbClient,
 		albClient: albClient,
 		servers:   servers,
@@ -229,13 +232,32 @@ func (a *albClient) ELbV2Svc() elbv2iface.ELBV2API {
 // RestartServers reboots the servers.
 // When rebooting, detach from the ELB and attach to the ELB when rebooting is complete.
 func (c *Client) RestartServers(conf Config) error {
-
 	for _, server := range c.servers {
 		if err := c.detachFromLoadBalancer(server, conf); err != nil {
 			return err
 		}
 
 		if err := c.restartServer(server, conf); err != nil {
+			return err
+		}
+
+		if err := c.attachWithLoadBalancer(server, conf); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ExecuteSsmRunCommand executes command on one or more managed instances.
+// When executing, detach from the ELB and attach to the ELB when rebooting is complete.
+func (c *Client) ExecuteSsmRunCommand(conf Config) error {
+	for _, server := range c.servers {
+		if err := c.detachFromLoadBalancer(server, conf); err != nil {
+			return err
+		}
+
+		if err := c.sendCommand(server, conf); err != nil {
 			return err
 		}
 
