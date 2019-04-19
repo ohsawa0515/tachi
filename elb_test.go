@@ -153,7 +153,8 @@ func TestRestartServers(t *testing.T) {
 	log.Println(albClient.Servers())
 
 	ec2Svc := &mockEC2Svc{}
-	elbClient := NewClient(ec2Svc, clbClient, albClient)
+	ssmSvc := &mockSsmSvc{}
+	elbClient := NewClient(ec2Svc, ssmSvc, clbClient, albClient)
 	if err := elbClient.RestartServers(conf); err != nil {
 		t.Error(err)
 	}
