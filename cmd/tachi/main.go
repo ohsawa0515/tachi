@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -34,7 +35,7 @@ func main() {
 	flag.StringVar(&region, "-region", "ap-northeast-1", "Region")
 	flag.Parse()
 
-	log := tachi.NewLogger()
+	log := tachi.NewLogger(os.Stderr)
 	conf := tachi.Config{
 		Elbs:             strings.Split(elbs, ","),
 		Mode:             mode,

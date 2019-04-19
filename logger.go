@@ -1,19 +1,19 @@
 package tachi
 
 import (
-	"os"
+	"io"
 
 	"github.com/Sirupsen/logrus"
 )
 
 // NewLogger -
-func NewLogger() *logrus.Logger {
+func NewLogger(output io.Writer) *logrus.Logger {
 	log := logrus.New()
 	log.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006/1/2 15:04:05 Z07:00",
 	})
-	log.Out = os.Stderr
+	log.SetOutput(output)
 	log.Level = logrus.InfoLevel
 
 	return log

@@ -2,9 +2,7 @@ package tachi
 
 import (
 	"context"
-	"log"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ssm"
@@ -14,6 +12,10 @@ import (
 type mockSsmSvc struct {
 	ssmiface.SSMAPI
 }
+
+var (
+	ssmSvc ssmiface.SSMAPI
+)
 
 func (ssmSvc *mockSsmSvc) DescribeInstanceInformation(*ssm.DescribeInstanceInformationInput) (*ssm.DescribeInstanceInformationOutput, error) {
 	return &ssm.DescribeInstanceInformationOutput{
@@ -41,16 +43,6 @@ func TestExecuteSsmRunCommand(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	elbs := []string{"test-clb", "test-alb"}
-	conf := Config{
-		Elbs:     elbs,
-		Timeout:  time.Duration(timeout) * time.Second,
-		CoolDown: time.Duration(coolDown) * time.Second,
-		Interval: time.Duration(interval) * time.Second,
-		Region:   region,
-		Logger:   NewLogger(),
-	}
-
 	clbClient, err := clbFetchInstancesUnderLB(ctx, conf)
 	if err != nil {
 		t.Error(err)
@@ -60,11 +52,6 @@ func TestExecuteSsmRunCommand(t *testing.T) {
 		t.Error(err)
 	}
 
-	log.Println(clbClient.Servers())
-	log.Println(albClient.Servers())
-
-	ec2Svc := &mockEC2Svc{}
-	ssmSvc := &mockSsmSvc{}
 	elbClient := NewClient(ec2Svc, ssmSvc, clbClient, albClient)
 	if err := elbClient.ExecuteSsmRunCommand(conf); err != nil {
 		t.Error(err)

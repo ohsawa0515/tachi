@@ -7,6 +7,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 )
 
+var (
+	ec2Svc ec2iface.EC2API
+)
+
 type mockEC2Svc struct {
 	ec2iface.EC2API
 }

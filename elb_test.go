@@ -2,7 +2,8 @@ package tachi
 
 import (
 	"context"
-	"log"
+	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -20,6 +21,10 @@ const (
 	interval = 2
 	waitTime = 2
 	region   = "us-east-1"
+)
+
+var (
+	conf Config
 )
 
 type mockElbSvc struct {
@@ -130,16 +135,6 @@ func TestRestartServers(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	elbs := []string{"test-clb", "test-alb"}
-	conf := Config{
-		Elbs:     elbs,
-		Timeout:  time.Duration(timeout) * time.Second,
-		CoolDown: time.Duration(coolDown) * time.Second,
-		Interval: time.Duration(interval) * time.Second,
-		Region:   region,
-		Logger:   NewLogger(),
-	}
-
 	clbClient, err := clbFetchInstancesUnderLB(ctx, conf)
 	if err != nil {
 		t.Error(err)
@@ -149,13 +144,30 @@ func TestRestartServers(t *testing.T) {
 		t.Error(err)
 	}
 
-	log.Println(clbClient.Servers())
-	log.Println(albClient.Servers())
-
-	ec2Svc := &mockEC2Svc{}
-	ssmSvc := &mockSsmSvc{}
 	elbClient := NewClient(ec2Svc, ssmSvc, clbClient, albClient)
 	if err := elbClient.RestartServers(conf); err != nil {
 		t.Error(err)
 	}
+}
+
+// main //
+func setup() {
+	elbs := []string{"test-clb", "test-alb"}
+	conf = Config{
+		Elbs:     elbs,
+		Timeout:  time.Duration(timeout) * time.Second,
+		CoolDown: time.Duration(coolDown) * time.Second,
+		Interval: time.Duration(interval) * time.Second,
+		Region:   region,
+		Logger:   NewLogger(ioutil.Discard), // do not output
+	}
+
+	ec2Svc = &mockEC2Svc{}
+	ssmSvc = &mockSsmSvc{}
+}
+
+func TestMain(m *testing.M) {
+	setup()
+	exitCode := m.Run()
+	os.Exit(exitCode)
 }
